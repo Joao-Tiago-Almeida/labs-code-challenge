@@ -8,6 +8,11 @@ Here is what the program does:
 4. If the distance between the current image and the target image is better than the previous iteration, then the mutation is accepted, otherwise the mutation is discarded.
 5. After X iterations, the program renders the image, saves it to disk and exits.
 
+Here is an example of the target and the output after 1_000_000 iterations: 
+
+![target.png](./challenge/result_example/target.png) 
+![target.png](./challenge/result_example/output.png) 
+
 
 ## Challenge:
 * Find 3 (or more) possible optimizations for this program to run faster. (Hint: think about the number of operations happening for each iteration, number of cores on your machine or concurrency)
