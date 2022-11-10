@@ -42,15 +42,20 @@ fn main() {
     // stores the newest random modification
     let mut new_shape: Triangle = random_triangle(image.width() as i32);
 
+    let width: u32 = image.width();
+
     // init the distance (output for the fitness fn)
-    let mut best_distance = 100f64;
-    
+    let mut best_distance = 100.0 * ((width*width) as f64);
+
+    // distance between images
+    let mut distance = 0f64;
+
     // NEW: get the starting time
     use std::time::Instant;
     let mut duration = 0;
     let mut now;
 
-    let epochs = 5000;
+    let epochs = 100;
 
     // index of the mutable triangle
     let mut index: usize = 0;
@@ -61,7 +66,7 @@ fn main() {
     let mut previous_image: Vec<RgbaImage> = vec![];
     previous_image.push(image.clone());
     for _ in 1..n_shapes {
-        previous_image.push(RgbaImage::new(image.width(), image.height()));  // TODO might be unnecessary
+        previous_image.push(RgbaImage::new(width, image.height()));  // TODO might be unnecessary
     }
     draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, true); // sends the value 0 so it can pass through the all vector
 
@@ -70,13 +75,13 @@ fn main() {
         now = Instant::now();
 
         // mutate a shape and get a copy of the shapes vector
-        mutate(&shapes, image.width() as i32, &mut index, &mut new_shape);
+        mutate(&shapes, width as i32, &mut index, &mut new_shape);
         
         // draw in the new image the vec of triangles with the mutated triangle
         draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
 
         // get the distance between the new image and the reference image
-        let distance = fitness(&image, &ref_image, image.width());
+        fitness(&image, &ref_image, width, &mut distance);
 
         // if the new distance is better than the best distance, we accept the mutation
         if best_distance > distance {
@@ -86,7 +91,7 @@ fn main() {
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        // println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+        if i%(1000) == 0 {println!("Mutation #{} - current distance: {}", i, best_distance/((width*width) as f64));}
 
     }
 
@@ -95,7 +100,7 @@ fn main() {
     draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
     _ = image.save(output_image_path);
 
-    println!("Best fitness {}", best_distance);
+    println!("Best fitness {}", best_distance/((width*width) as f64));
     println!("Total running time {:.3} seconds", (begin.elapsed().as_millis() as f32)/1000.0);
 }
 
@@ -141,28 +146,21 @@ fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previ
 
         if save_previous && (i != n_shapes-1) { previous_image[i+1] = image.clone();}
     }
- }
+}
 
 // Fitness returns the average rgb color distance between 2 images
 // it basically compares all pixels for 2 given images and returns
 // a percentage that represents the similarities between the 2 images
 // 0: the 2 images are the same
-fn fitness(image: &ImgRGBA, ref_image: &ImgRGBA, w: u32) -> f64 {
-    
-    let mut tot = 0f64;
-    let wh = w as f64;
+fn fitness(image: &ImgRGBA, ref_image: &ImgRGBA, w: u32, fitness: &mut f64){
 
-    for i in 0..w {
+    *fitness = 0.0;
+    for i in 0..w{
         for j in 0..w {
-            let p1 = image.get_pixel(i, j);
-            let p2 = ref_image.get_pixel(i, j);
-            let distance = color_distance(p1, p2);            
-            tot = tot + distance;
+            *fitness = *fitness + color_distance(image.get_pixel(i, j), ref_image.get_pixel(i, j));
         }
     }
-    return tot / (wh*wh);
 }
-
 
 // color_distance returns the distance between 2 RGB colors
 fn color_distance(color_1: &Rgba<u8>, color_2: &Rgba<u8>) -> f64{
@@ -176,14 +174,14 @@ fn color_distance(color_1: &Rgba<u8>, color_2: &Rgba<u8>) -> f64{
     let b2 = color_2[2] as f64;
 
     let result = (r1 - r2)*(r1 - r2) + (g1 - g2)*(g1 - g2) + (b1 - b2)*(b1 - b2);
-    result.sqrt() / 2.55
+    return result.sqrt() / 2.55
 }
 
 // random_point creates and returns a random point
 fn random_point(w: i32) -> Point {
     Point{ 
-        x: rand::thread_rng().gen_range(0..=w as u32),
-        y: rand::thread_rng().gen_range(0..=w as u32) 
+        x: rand::thread_rng().gen_range(0..w as u32),
+        y: rand::thread_rng().gen_range(0..w as u32) 
     }
 }
 
@@ -240,20 +238,30 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
     let x3 = triangle.points[2].x as i32;
     let y3 = triangle.points[2].y as i32;
 
-    let xmin = min(x1, min(x2, x3)) as i32;
-    let xmax = min(max(x1, max(x2, x3)), image.width() as i32); // TODO this should already be clamped before
-    let ymin = min(y1, min(y2, y3)) as i32;
-    let ymax = min(max(y1, max(y2, y3)), image.height() as i32);
+    let xmin = min(x1, min(x2, x3));
+    let xmax = max(x1, max(x2, x3)); // TODO this should already be clamped before
+    let ymin = min(y1, min(y2, y3));
+    let ymax = max(y1, max(y2, y3));
 
     // TODO http://totologic.blogspot.com/2014/01/accurate-point-in-triangle-test.html
+
+    // pre compute all constant values
+    let x21 = x2-x1;
+    let y21 = y2-y1;
+    let s21 = y21*x1-x21*y1;
+    let x31 = x3-x1;
+    let y31 = y3-y1;
+    let s31 = y31*x1-x31*y1;
+    let x32 = x3-x2;
+    let y32 = y3-y2;
+    let s32 = y32*x2-x32*y2;
+
+
     for x in xmin .. xmax  {
         for y in ymin .. ymax {
-            let asx = x - x1;
-            let asy = y - y1;
 
-            let sab = (x2 - x1) * asy - (y2 - y1) * asx > 0;
-            if ((x3 - x1) * asy - (y3 - y1) * asx > 0) == sab { continue };
-            if ((x3 - x2) * (y - y2) - (y3 - y2) * (x - x2) > 0) != sab { continue };
+            if (y*x21-x*y21 + s21 > 0) == (y*x31-x*y31 + s31 > 0) {continue;};
+            if (y*x21-x*y21 + s21 > 0) != (y*x32-x*y32 + s32 > 0) {continue;};
 
             let current_pixel_color = image.get_pixel(x as u32, y as u32);
             let color = blend_color(current_pixel_color, &triangle.color);

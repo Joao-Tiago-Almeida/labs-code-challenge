@@ -30,7 +30,6 @@ fn main() {
     // opens a reference image for the fitness func
     let ref_image = image::open(target_image_path).unwrap().into_rgba8();
 
-
     // creates the triangles
     let mut shapes: Vec<Triangle> = vec![];
     for _ in 0..50 {
@@ -69,7 +68,7 @@ fn main() {
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        // println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+        // println!("Mutation #{} - current distance: {}", i, best_distance);
         
     }
 
