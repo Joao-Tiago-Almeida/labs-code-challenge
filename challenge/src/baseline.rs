@@ -40,15 +40,16 @@ fn main() {
     // init the distance (output for the fitness fn)
     let mut best_distance = 100f64;
     
+    // get the starting time
+    use std::time::Instant;
     let mut duration = 0;
+    let mut now;
 
-    let epoch = 10;
+    let epochs = 1000;
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
-    for i in 0..epoch{
-        // get the starting time
-        use std::time::Instant;
-        let now = Instant::now();
+    for i in 0..epochs{
+        now = Instant::now();
 
         // create a new image with white background
         init_image(&mut image);
@@ -68,13 +69,11 @@ fn main() {
             best_distance = distance;
         }
 
-        duration += now.elapsed().as_secs();
-        println!("duration #{}", duration);
-        println!("Mutation #{} - current distance: {}", i, best_distance);
-        _ = now.elapsed() // discard prints
+        duration += now.elapsed().as_millis();
+        println!("Mutation #{} - current distance: {:.4}", i, best_distance);
     }
 
-    println!("Computational time for {}: {}", epoch, duration);
+    println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0));
 
     draw(&mut image, &shapes);
     _ = image.save(output_image_path);
