@@ -19,7 +19,8 @@ struct Point { // TODO if we set the max length of image to 256, it is only need
 
 // Main is the entry point of the program
 fn main() {
-
+    let begin = Instant::now();
+    
     let target_image_path = "target.png";
     let output_image_path = "output.png";
 
@@ -44,14 +45,13 @@ fn main() {
     use std::time::Instant;
     let mut duration = 0;
     let mut now;
-    let epochs = 100;
+    let epochs = 5000;
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
+        now = Instant::now();
         // create a new image with white background
         init_image(&mut image);
-
-        now = Instant::now();
 
         // mutate a shape and get a copy of the shapes vector
         let new_shapes = mutate(&shapes, image.width() as i32);
@@ -69,14 +69,17 @@ fn main() {
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+        // println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+        
     }
 
     println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
 
     draw(&mut image, &shapes);
     _ = image.save(output_image_path);
-    
+
+    println!("Best fitness {}", best_distance);
+    println!("Total running time {:.3} seconds", (begin.elapsed().as_millis() as f32)/1000.0);
 }
 
 // init_image creates a new image with a white background

@@ -19,6 +19,7 @@ struct Point { // TODO if we set the max length of image to 256, it is only need
 
 // Main is the entry point of the program
 fn main() {
+    let begin = Instant::now();
 
     let target_image_path = "../target.png";
     let output_image_path = "output.png";
@@ -38,6 +39,9 @@ fn main() {
         shapes.push(triangle);
     }
 
+    // stores the newest random modification
+    let mut new_shape: Triangle = random_triangle(image.width() as i32);
+
     // init the distance (output for the fitness fn)
     let mut best_distance = 100f64;
     
@@ -45,8 +49,10 @@ fn main() {
     use std::time::Instant;
     let mut duration = 0;
     let mut now;
-    let epochs = 100;
 
+    let epochs = 5000;
+
+    // index of the mutable triangle
     let mut index: usize = 0;
 
     // create a new image with white background
@@ -57,38 +63,40 @@ fn main() {
     for _ in 1..n_shapes {
         previous_image.push(RgbaImage::new(image.width(), image.height()));  // TODO might be unnecessary
     }
-    draw(&mut image, &shapes, &mut previous_image, 0, n_shapes, true); // sends the value 0 so it can pass through the all vector
+    draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, true); // sends the value 0 so it can pass through the all vector
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
-
         now = Instant::now();
 
         // mutate a shape and get a copy of the shapes vector
-        let new_shapes = mutate(&shapes, image.width() as i32, &mut index);
+        mutate(&shapes, image.width() as i32, &mut index, &mut new_shape);
         
         // draw in the new image the vec of triangles with the mutated triangle
-        draw(&mut image, &new_shapes, &mut previous_image, index, n_shapes, false);
+        draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
 
         // get the distance between the new image and the reference image
         let distance = fitness(&image, &ref_image, image.width());
 
         // if the new distance is better than the best distance, we accept the mutation
         if best_distance > distance {
-            shapes = new_shapes;
-            draw(&mut image, &shapes, &mut previous_image, index, n_shapes, true);
+            shapes[index] = new_shape.clone();
+            draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, true);
             best_distance = distance;
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+        // println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
+
     }
 
     println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
 
-    // draw(&mut image, &shapes);
+    draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
     _ = image.save(output_image_path);
-    
+
+    println!("Best fitness {}", best_distance);
+    println!("Total running time {:.3} seconds", (begin.elapsed().as_millis() as f32)/1000.0);
 }
 
 // init_image creates a new image with a white background
@@ -125,10 +133,11 @@ fn random_color_rgba() -> Rgba<u8> {
 }
 
 // draw draws a vec of shapes into an the pixel buffer
-fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, save_previous: bool) {
+fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, save_previous: bool) {
     *image = previous_image[index].clone();
     for i in index..n_shapes {
-        draw_triangle(&shapes[i], image);
+        if i!=index {draw_triangle(&shapes[i], image);} // immutable triangles
+        else {draw_triangle(&new_shape, image)}         // newest triangle
 
         if save_previous && (i != n_shapes-1) { previous_image[i+1] = image.clone();}
     }
@@ -179,24 +188,22 @@ fn random_point(w: i32) -> Point {
 }
 
 // Mutate mutates a vertice coordinates or a color
-fn mutate(shapes: & Vec<Triangle>, w: i32, index: &mut usize) -> Vec<Triangle> {
-
-    let mut shapes_copy = shapes.to_vec();
+fn mutate(shapes: & Vec<Triangle>, w: i32, index: &mut usize, new_shape:&mut Triangle) {
 
     let point_mutation = rand::thread_rng().gen_range(0..2);
     *index = rand::thread_rng().gen_range(0..shapes.len());
 
+    *new_shape = shapes[*index].clone();
+
     if point_mutation == 1 { // here we mutate a vertice
         let new_point = random_point(w);
         let vertice_index = rand::thread_rng().gen_range(0..3);
-        shapes_copy[*index].points[vertice_index] = new_point;
+        new_shape.points[vertice_index] = new_point;
     } else { // here we mutate a color
         let new_color = random_color_rgba();
-        shapes_copy[*index].color = new_color;
+        new_shape.color = new_color;
     }
-
     // TODO change the stacking order to improve the accuracy
-    return shapes_copy
 }
 
 // blend_color blends 2 colors together
