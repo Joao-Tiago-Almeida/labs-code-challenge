@@ -12,7 +12,7 @@ struct Triangle {
 }
 // Point is used by the Triangle struct and represents a vertice
 #[derive(Clone)]
-struct Point { // if we set the max length of image to 256, it is only need 1 byte to represent the coordinates <u8>
+struct Point { // TODO if we set the max length of image to 256, it is only need 1 byte to represent the coordinates <u8>
     x: u32, 
     y: u32
 }
@@ -40,18 +40,18 @@ fn main() {
     // init the distance (output for the fitness fn)
     let mut best_distance = 100f64;
     
+    // NEW: get the starting time
+    use std::time::Instant;
     let mut duration = 0;
-
-    let epoch = 10;
+    let mut now;
+    let epochs = 100;
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
-    for i in 0..epoch{
-        // get the starting time
-        use std::time::Instant;
-        let now = Instant::now();
-
+    for i in 0..epochs{
         // create a new image with white background
         init_image(&mut image);
+
+        now = Instant::now();
 
         // mutate a shape and get a copy of the shapes vector
         let new_shapes = mutate(&shapes, image.width() as i32);
@@ -68,13 +68,11 @@ fn main() {
             best_distance = distance;
         }
 
-        duration += now.elapsed().as_secs();
-        println!("duration #{}", duration);
-        println!("Mutation #{} - current distance: {}", i, best_distance);
-        _ = now.elapsed() // discard prints
+        duration += now.elapsed().as_millis(); // NEW
+        println!("Mutation #{} - current distance: {} - {}", i, best_distance, distance);
     }
 
-    println!("Computational time for {}: {}", epoch, duration);
+    println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
 
     draw(&mut image, &shapes);
     _ = image.save(output_image_path);
@@ -182,7 +180,7 @@ fn mutate<'a>(shapes: &'a Vec<Triangle>, w: i32) -> Vec<Triangle> {
         shapes_copy[index].color = new_color;
     }
 
-    // change the stacking order to improve the accuracy
+    // TODO change the stacking order to improve the accuracy
     return shapes_copy
 }
 
