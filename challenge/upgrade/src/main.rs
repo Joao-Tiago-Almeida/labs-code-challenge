@@ -26,7 +26,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let target_image_path = "monalisa.png";
-    let output_image_path = "monalisa-out1e6.png";
+    let output_image_path = "monalisa-out.png";
 
     // number of epochs
     let epochs = args[1].parse::<i32>().unwrap();
@@ -68,12 +68,18 @@ fn main() {
     // create a new image with white background
     init_image(&mut image);
 
+    // create struct to memorize which point to be saved in each image
+    let dummy_point: Point = Point{x:0,y:0};
+    let mut dummy_layer: Vec<Point> = vec![];
+    let mut written_pixels: Vec<Vec<Point>> = vec![];
+    for _ in 0..width*height/2 + 1 { dummy_layer.push( dummy_point.clone() ) } // the biggest triangle occupies the maximum of the size of the image. The +1 saves space to know how many pixel that triangles occupies e.g. Point{x:n_triangle, y:0}
+    for _ in 0..n_shapes { written_pixels.push( dummy_layer.clone() ) }         // the first triangle is not needed tp be counted, since it is chanced every time it is looked // TODO changes 0 to 1
+
     let mut previous_image: Vec<RgbaImage> = vec![];
-    previous_image.push(image.clone());
-    for _ in 1..n_shapes {
-        previous_image.push(RgbaImage::new(width, image.height()));  // TODO might be unnecessary
+    for _ in 0..n_shapes {
+        previous_image.push(image.clone());  // TODO create dummy image
     }
-    draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, true); // sends the value 0 so it can pass through the all vector
+    draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, &mut written_pixels, true); // sends the value 0 so it can pass through the all vector
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
@@ -83,7 +89,7 @@ fn main() {
         mutate(&shapes, width, &mut index, &mut new_shape);
         
         // draw in the new image the vec of triangles with the mutated triangle
-        draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
+        draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, false);
 
         // get the distance between the new image and the reference image
         fitness(&image, &ref_image, &mut distance);
@@ -91,17 +97,17 @@ fn main() {
         // if the new distance is better than the best distance, we accept the mutation
         if best_distance > distance {
             shapes[index] = new_shape.clone();
-            draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, true);
+            draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, true);
             best_distance = distance;
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        if i%max(epochs/100,1) == 0 {println!("Mutation #{} - current distance: {}", i, (best_distance as f32/((width*height) as f32)));}
+        if i%max(epochs/100,1) == 0 {println!("Mutation #{} - current distance: {} - {}", i, (best_distance as f32/((width*height) as f32)), (distance as f32/((width*height) as f32)));}
     }
 
     println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
 
-    draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, false);
+    draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, false);
     _ = image.save(output_image_path);
 
     println!("Best fitness {}", (best_distance as f32/((width*height) as f32)));
@@ -142,13 +148,13 @@ fn random_color_rgba() -> Rgba<u8> {
 }
 
 // draw draws a vec of shapes into an the pixel buffer
-fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, save_previous: bool) {
+fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, written_pixels: &mut Vec<Vec<Point>>, save_best: bool) {
     *image = previous_image[index].clone();
     for i in index..n_shapes {
-        if i!=index {draw_triangle(&shapes[i], image);} // immutable triangles
-        else {draw_triangle(&new_shape, image)}         // newest triangle
+        if i!=index {overlapping_triangle(&shapes[i], image, &written_pixels[i]);}          // it sees which pixels it needs to update according for each triangle on top of the newest - 2nd and remaining iterations of the loop
+        else {draw_triangle(&new_shape, image, &mut written_pixels[i], save_best)}         // it draws the new triangle on top of a the saved image before this layer - 1st iteration of the loop
 
-        if save_previous && (i != n_shapes-1) { previous_image[i+1] = image.clone();}
+        if save_best && (i != n_shapes-1) { previous_image[i+1] = image.clone();}
     }
 }
 
@@ -235,7 +241,7 @@ fn blend_color(c1 :&Rgba<u8>, c2: &Rgba<u8>) -> Rgba<u8> {
 }
 
 // draw_triangle draws a triangle in a given image
-fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
+fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA, written_pixel: &mut Vec<Point>, save_best: bool) {
     let x1 = triangle.points[0].x as i32;
     let y1 = triangle.points[0].y as i32;
 
@@ -261,6 +267,8 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
     let y32 = y3-y2;
     let s32 = y32*x2-x32*y2;
 
+    // save the information of the pixels to write
+    let mut n_pixels = 0;
 
     for x in xmin .. xmax  {
         for y in ymin .. ymax {
@@ -270,7 +278,24 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
 
             let current_pixel_color = image.get_pixel(x as u32, y as u32);
             let color = blend_color(current_pixel_color, &triangle.color);
-            image.put_pixel(x as u32, y as u32, color)
+            image.put_pixel(x as u32, y as u32, color);
+
+            // save pixel coordinates
+            if save_best {
+                n_pixels=n_pixels+1;
+                written_pixel[n_pixels].x = x as u32;
+                written_pixel[n_pixels].y = y as u32;
+            };
         }
+    }
+    if save_best { written_pixel[0].x = n_pixels as u32; };
+}
+
+fn overlapping_triangle(triangle: &Triangle, image: &mut ImgRGBA, written_pixel: &Vec<Point>) {
+
+    for pixel in 1..written_pixel[0].x as usize {
+        let current_pixel_color = image.get_pixel(written_pixel[pixel].x, written_pixel[pixel].y);
+        let color = blend_color(current_pixel_color, &triangle.color);
+        image.put_pixel(written_pixel[pixel].x, written_pixel[pixel].y, color);
     }
 }
