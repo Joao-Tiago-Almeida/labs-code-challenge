@@ -2,6 +2,7 @@ use image::{Rgba, RgbaImage};
 use std::{cmp::{max, min}};
 use rand::Rng;
 use std::time::Instant;
+use std::env;
 
 // type alias, so we can use the type ImgRGBA instead of ImageBuffer<Rgba<u8>, Vec<u8>> 
 type ImgRGBA = image::ImageBuffer<Rgba<u8>, Vec<u8>>;
@@ -22,18 +23,24 @@ struct Point { // TODO if we set the max length of image to 256, it is only need
 fn main() {
     let begin = Instant::now();
 
-    let target_image_path = "../target.png";
-    let output_image_path = "output.png";
+    let args: Vec<String> = env::args().collect();
+
+    let target_image_path = "monalisa.png";
+    let output_image_path = "monalisa-out1e6.png";
+
+    // number of epochs
+    let epochs = args[1].parse::<i32>().unwrap();
+
+    let (width, height) = image::image_dimensions(target_image_path).unwrap();
+
 
     // creates a blank image we're going to paint in
-    let mut image = RgbaImage::new(128, 128);
+    let mut image = RgbaImage::new(width, height);
     
     // opens a reference image for the fitness func
     let ref_image = image::open(target_image_path).unwrap().into_rgba8();
 
     let n_shapes = 50; // total number of shapes
-    let width: u32 = image.width();  // attention to larger images 
-    let height: u32 = image.height();  // attention to larger images 
 
     // creates the triangles
     let mut shapes: Vec<Triangle> = vec![];
@@ -54,8 +61,6 @@ fn main() {
     // NEW: get the starting time
     let mut duration = 0;
     let mut now;
-
-    let epochs = 1000;
 
     // index of the mutable triangle
     let mut index: usize = 0;
@@ -91,7 +96,7 @@ fn main() {
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        if i%(10) == 0 {println!("Mutation #{} - current distance: {}", i, (best_distance as f32/((width*height) as f32)));}
+        if i%max(epochs/100,1) == 0 {println!("Mutation #{} - current distance: {}", i, (best_distance as f32/((width*height) as f32)));}
     }
 
     println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
@@ -231,14 +236,14 @@ fn blend_color(c1 :&Rgba<u8>, c2: &Rgba<u8>) -> Rgba<u8> {
 
 // draw_triangle draws a triangle in a given image
 fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
-    let x1 = triangle.points[0].x as i16;
-    let y1 = triangle.points[0].y as i16;
+    let x1 = triangle.points[0].x as i32;
+    let y1 = triangle.points[0].y as i32;
 
-    let x2 = triangle.points[1].x as i16;
-    let y2 = triangle.points[1].y as i16;
+    let x2 = triangle.points[1].x as i32;
+    let y2 = triangle.points[1].y as i32;
 
-    let x3 = triangle.points[2].x as i16;
-    let y3 = triangle.points[2].y as i16;
+    let x3 = triangle.points[2].x as i32;
+    let y3 = triangle.points[2].y as i32;
 
     let xmin = min(x1, min(x2, x3));
     let xmax = max(x1, max(x2, x3));
@@ -246,15 +251,15 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
     let ymax = max(y1, max(y2, y3));
 
     // pre compute all constant values
-    let x21:i16 = x2-x1;
-    let y21:i16 = y2-y1;
-    let s21:i16 = y21*x1-x21*y1;
-    let x31:i16 = x3-x1;
-    let y31:i16 = y3-y1;
-    let s31:i16 = y31*x1-x31*y1;
-    let x32:i16 = x3-x2;
-    let y32:i16 = y3-y2;
-    let s32:i16 = y32*x2-x32*y2;
+    let x21 = x2-x1;
+    let y21 = y2-y1;
+    let s21 = y21*x1-x21*y1;
+    let x31 = x3-x1;
+    let y31 = y3-y1;
+    let s31 = y31*x1-x31*y1;
+    let x32 = x3-x2;
+    let y32 = y3-y2;
+    let s32 = y32*x2-x32*y2;
 
 
     for x in xmin .. xmax  {

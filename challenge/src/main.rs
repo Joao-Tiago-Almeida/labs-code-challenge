@@ -44,7 +44,7 @@ fn main() {
     use std::time::Instant;
     let mut duration = 0;
     let mut now;
-    let epochs = 1000;
+    let epochs = 1000000;
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
@@ -68,7 +68,7 @@ fn main() {
         }
 
         duration += now.elapsed().as_millis(); // NEW
-        if i%(10) == 0 {println!("Mutation #{} - current distance: {}", i, best_distance)};
+        if i%(10000 ) == 0 {println!("Mutation #{} - current distance: {}", i, best_distance)};
         
     }
 
