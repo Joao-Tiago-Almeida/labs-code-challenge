@@ -33,7 +33,6 @@ fn main() {
 
     let (width, height) = image::image_dimensions(target_image_path).unwrap();
 
-
     // creates a blank image we're going to paint in
     let mut image = RgbaImage::new(width, height);
     
@@ -42,15 +41,15 @@ fn main() {
 
     let n_shapes = 50; // total number of shapes
 
-    // creates the triangles
-    let mut shapes: Vec<Triangle> = vec![];
-    for _ in 0..n_shapes {
-        let triangle = random_triangle(width, height);
-        shapes.push(triangle);
-    }
-
     // stores the newest random modification
     let mut new_shape: Triangle = random_triangle(width, height);
+
+    // creates the triangles
+    // let mut shapes: Vec<Triangle> = vec![new_shape.clone(); n_shapes];
+    let mut shapes: Vec<Triangle> = vec![];
+    for _ in 0..n_shapes {
+        shapes.push(random_triangle(width, height));
+    }
 
     // init the distance (output for the fitness fn)
     let mut best_distance = u32::MAX;
@@ -60,6 +59,7 @@ fn main() {
 
     // NEW: get the starting time
     let mut duration = 0;
+    let mut rate;
     let mut now;
 
     // index of the mutable triangle
@@ -69,48 +69,59 @@ fn main() {
     init_image(&mut image);
 
     // create struct to memorize which point to be saved in each image
-    let dummy_point: Point = Point{x:0,y:0};
-    let mut dummy_layer: Vec<Point> = vec![];
-    let mut written_pixels: Vec<Vec<Point>> = vec![];
-    for _ in 0..width*height/2 + 1 { dummy_layer.push( dummy_point.clone() ) } // the biggest triangle occupies the maximum of the size of the image. The +1 saves space to know how many pixel that triangles occupies e.g. Point{x:n_triangle, y:0}
-    for _ in 0..n_shapes { written_pixels.push( dummy_layer.clone() ) }         // the first triangle is not needed tp be counted, since it is chanced every time it is looked // TODO changes 0 to 1
+    let mut dummy_layer: Vec<Point> = vec![Point{x:0,y:0}; (width*height/2 + 1) as usize]; // the biggest triangle occupies the maximum of the size of the image. The +1 saves space to know how many pixel that triangles occupies e.g. Point{x:n_triangle, y:0}
+    let mut written_pixels: Vec<Vec<Point>> = vec![dummy_layer.clone(); n_shapes]; // the first triangle is not needed to be counted, since it is chanced every time it is looked 
 
-    let mut previous_image: Vec<RgbaImage> = vec![];
-    for _ in 0..n_shapes {
-        previous_image.push(image.clone());  // TODO create dummy image
+    let mut previous_image: Vec<RgbaImage> = vec![image.clone(); n_shapes];
+    // draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, &written_pixels, &mut dummy_layer, true); // sends the value 0 so it can pass through the all vector
+    for i in 0..n_shapes {
+        previous_image[i] = image.clone();
+        draw_triangle(&shapes[i], &mut image, &mut written_pixels[i]);
     }
-    draw(&mut image, &shapes, &new_shape, &mut previous_image, 0, n_shapes, &mut written_pixels, true); // sends the value 0 so it can pass through the all vector
+
+    // distance between the image and the target image
+    let mut distance_matrix: Vec<u32> = vec![u32::MAX; (width*height) as usize];
+    // init this matrix
+    for x in 0..width {
+        for y in 0..height {
+            distance_matrix[(x*height+y) as usize] = color_distance(image.get_pixel(x, y), ref_image.get_pixel(x, y));   // get the initial distance between for each pixel
+        }
+    }
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
         now = Instant::now();
-
+        
         // mutate a shape and get a copy of the shapes vector
         mutate(&shapes, width, &mut index, &mut new_shape);
         
         // draw in the new image the vec of triangles with the mutated triangle
-        draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, false);
-
-        // get the distance between the new image and the reference image
-        fitness(&image, &ref_image, &mut distance);
+        draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &written_pixels, &mut dummy_layer, false);
+        
+        // computes the distance between the new image and the reference image
+        fitness(&image, &ref_image, &mut distance, &mut distance_matrix, &dummy_layer, &written_pixels[index], false);
 
         // if the new distance is better than the best distance, we accept the mutation
         if best_distance > distance {
             shapes[index] = new_shape.clone();
-            draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, true);
+            fitness(&image, &ref_image, &mut distance, &mut distance_matrix, &dummy_layer, &written_pixels[index], true);   // important to be called before losing the previous shape information 
+            written_pixels[index] = dummy_layer.clone();
+            draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &written_pixels, &mut dummy_layer, true);
             best_distance = distance;
         }
 
-        duration += now.elapsed().as_millis(); // NEW
-        if i%max(epochs/100,1) == 0 {println!("Mutation #{} - current distance: {} - {}", i, (best_distance as f32/((width*height) as f32)), (distance as f32/((width*height) as f32)));}
+        rate = now.elapsed().as_millis(); // NEW
+        if i%max(epochs/100,1) == 0 {println!("Mutation #{} - current distance: {:.3} - rate {:.3}", i, (best_distance as f32)/((width*height) as f32), 1000.0/rate as f32);}
+        duration += rate;
     }
 
     println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
 
-    draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &mut written_pixels, false);
+    // draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &written_pixels, &mut dummy_layer, false);
+    for i in 0..n_shapes { draw_triangle(&shapes[i], &mut image, &mut written_pixels[i]); }
     _ = image.save(output_image_path);
 
-    println!("Best fitness {}", (best_distance as f32/((width*height) as f32)));
+    println!("Best fitness {}", (best_distance as f32)/((width*height) as f32));
     println!("Total running time {:.3} seconds", (begin.elapsed().as_millis() as f32)/1000.0);
 }
 
@@ -148,11 +159,11 @@ fn random_color_rgba() -> Rgba<u8> {
 }
 
 // draw draws a vec of shapes into an the pixel buffer
-fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, written_pixels: &mut Vec<Vec<Point>>, save_best: bool) {
+fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previous_image: &mut Vec<ImgRGBA>, index: usize, n_shapes: usize, written_pixels: &Vec<Vec<Point>>, dummy_layer: &mut Vec<Point>, save_best: bool) {
     *image = previous_image[index].clone();
     for i in index..n_shapes {
         if i!=index {overlapping_triangle(&shapes[i], image, &written_pixels[i]);}          // it sees which pixels it needs to update according for each triangle on top of the newest - 2nd and remaining iterations of the loop
-        else {draw_triangle(&new_shape, image, &mut written_pixels[i], save_best)}         // it draws the new triangle on top of a the saved image before this layer - 1st iteration of the loop
+        else {draw_triangle(&new_shape, image, dummy_layer)}         // it draws the new triangle on top of a the saved image before this layer - 1st iteration of the loop
 
         if save_best && (i != n_shapes-1) { previous_image[i+1] = image.clone();}
     }
@@ -162,20 +173,42 @@ fn draw(image: &mut ImgRGBA, shapes: &Vec<Triangle>, new_shape: &Triangle, previ
 // it basically compares all pixels for 2 given images and returns
 // a percentage that represents the similarities between the 2 images
 // 0: the 2 images are the same
-fn fitness(image: &ImgRGBA, ref_image: &ImgRGBA, fitness: &mut u32){
+fn fitness(image: &ImgRGBA, ref_image: &ImgRGBA, fitness: &mut u32, distance_matrix: &mut Vec<u32>, dummy_layer: &Vec<Point>, old_layer: &Vec<Point>, save_matrix: bool){
+
+    let w = image.width();
+    let h = image.height();
+    let mut distance_matrix_aux: Vec<u32> = (*distance_matrix).clone();
+    *fitness = 0;
+    let mut x;
+    let mut y;
+
+    // get the changes in the pixels modified by removing the current shape
+    for pixel in 1..=old_layer[0].x as usize {
+        x = old_layer[pixel].x;
+        y = old_layer[pixel].y;
+        distance_matrix_aux[(x * h + y) as usize] = color_distance(image.get_pixel(x, y), ref_image.get_pixel(x, y));
+    }
+    
+    // get the changes in the pixels modified by removing the new hypothesis shape
+    for pixel in 1..=dummy_layer[0].x as usize {
+        x = dummy_layer[pixel].x;
+        y = dummy_layer[pixel].y;
+        distance_matrix_aux[(x * h + y) as usize] = color_distance(image.get_pixel(x, y), ref_image.get_pixel(x, y));
+    }
 
     *fitness = 0;
-    let w:u32 = image.width();
-    let h:u32 = image.height();
-    for i in 0..w as u32{
-        for j in 0..h as u32{
-            *fitness = *fitness + color_distance(image.get_pixel(i, j), ref_image.get_pixel(i, j));
+
+    for x in 0..w{
+        for y in 0..h{
+            *fitness += distance_matrix_aux[(x * h + y) as usize];
         }
     }
+
+    if save_matrix {*distance_matrix = distance_matrix_aux.clone()}
 }
 
 // color_distance returns the distance between 2 RGB colors
-fn color_distance(color_1: &Rgba<u8>, color_2: &Rgba<u8>) ->u32{
+fn color_distance(color_1: &Rgba<u8>, color_2: &Rgba<u8>) -> u32{
 
     let r1 = color_1[0] as i32;
     let g1 = color_1[1] as i32;
@@ -187,7 +220,7 @@ fn color_distance(color_1: &Rgba<u8>, color_2: &Rgba<u8>) ->u32{
 
     let result:f32 = ((r1 - r2)*(r1 - r2) + (g1 - g2)*(g1 - g2) + (b1 - b2)*(b1 - b2)) as f32;
     return ( result.sqrt() / 2.55 ) as u32;
- }
+}
 
 // random_point creates and returns a random point
 fn random_point(w: u32, h: u32) -> Point {
@@ -241,7 +274,7 @@ fn blend_color(c1 :&Rgba<u8>, c2: &Rgba<u8>) -> Rgba<u8> {
 }
 
 // draw_triangle draws a triangle in a given image
-fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA, written_pixel: &mut Vec<Point>, save_best: bool) {
+fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA, dummy_layer: &mut Vec<Point>) {
     let x1 = triangle.points[0].x as i32;
     let y1 = triangle.points[0].y as i32;
 
@@ -281,19 +314,17 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA, written_pixel: &mut V
             image.put_pixel(x as u32, y as u32, color);
 
             // save pixel coordinates
-            if save_best {
-                n_pixels=n_pixels+1;
-                written_pixel[n_pixels].x = x as u32;
-                written_pixel[n_pixels].y = y as u32;
-            };
+            n_pixels=n_pixels+1;
+            dummy_layer[n_pixels].x = x as u32;
+            dummy_layer[n_pixels].y = y as u32;
         }
     }
-    if save_best { written_pixel[0].x = n_pixels as u32; };
+
+    dummy_layer[0].x = n_pixels as u32;
 }
 
 fn overlapping_triangle(triangle: &Triangle, image: &mut ImgRGBA, written_pixel: &Vec<Point>) {
-
-    for pixel in 1..written_pixel[0].x as usize {
+    for pixel in 1..=written_pixel[0].x as usize {
         let current_pixel_color = image.get_pixel(written_pixel[pixel].x, written_pixel[pixel].y);
         let color = blend_color(current_pixel_color, &triangle.color);
         image.put_pixel(written_pixel[pixel].x, written_pixel[pixel].y, color);
