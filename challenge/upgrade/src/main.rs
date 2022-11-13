@@ -26,7 +26,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let target_image_path = "monalisa.png";
-    let output_image_path = "monalisa-out.png";
+    let output_image_path = "output-monalisa.png";
 
     // number of epochs
     let epochs = args[1].parse::<i32>().unwrap();
@@ -93,7 +93,7 @@ fn main() {
         now = Instant::now();
         
         // mutate a shape and get a copy of the shapes vector
-        mutate(&shapes, width, &mut index, &mut new_shape);
+        mutate(&shapes, width, height, &mut index, &mut new_shape);
         
         // draw in the new image the vec of triangles with the mutated triangle
         draw(&mut image, &shapes, &new_shape, &mut previous_image, index, n_shapes, &written_pixels, &mut dummy_layer, false);
@@ -231,7 +231,7 @@ fn random_point(w: u32, h: u32) -> Point {
 }
 
 // Mutate mutates a vertice coordinates or a color
-fn mutate(shapes: & Vec<Triangle>, w: u32, index: &mut usize, new_shape:&mut Triangle) {
+fn mutate(shapes: & Vec<Triangle>, w: u32, h: u32, index: &mut usize, new_shape:&mut Triangle) {
 
     let point_mutation = rand::thread_rng().gen_range(0..2);
     *index = rand::thread_rng().gen_range(0..shapes.len());
@@ -242,7 +242,7 @@ fn mutate(shapes: & Vec<Triangle>, w: u32, index: &mut usize, new_shape:&mut Tri
 
         let vertice_index = rand::thread_rng().gen_range(0..3);
         new_shape.points[vertice_index].x = rand::thread_rng().gen_range(0..w);
-        new_shape.points[vertice_index].y = rand::thread_rng().gen_range(0..w);
+        new_shape.points[vertice_index].y = rand::thread_rng().gen_range(0..h);
 
     } else { // here we mutate a color
         let color_index = rand::thread_rng().gen_range(0..4);

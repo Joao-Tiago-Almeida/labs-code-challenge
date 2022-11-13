@@ -12,7 +12,7 @@ struct Triangle {
 }
 // Point is used by the Triangle struct and represents a vertice
 #[derive(Clone)]
-struct Point { // TODO if we set the max length of image to 256, it is only need 1 byte to represent the coordinates <u8>
+struct Point {
     x: u32, 
     y: u32
 }
@@ -40,11 +40,10 @@ fn main() {
     // init the distance (output for the fitness fn)
     let mut best_distance = 100f64;
     
-    // NEW: get the starting time
     use std::time::Instant;
     let mut duration = 0;
     let mut now;
-    let epochs = 5000;
+    let epochs = 10000;
 
     // main loop, runs mutation, gets fitness (distance between 2 images), keeps or discards a mutation
     for i in 0..epochs{
@@ -67,12 +66,12 @@ fn main() {
             best_distance = distance;
         }
 
-        duration += now.elapsed().as_millis(); // NEW
+        duration += now.elapsed().as_millis();
         println!("Mutation #{} - current distance: {}", i, best_distance);
         
     }
 
-    println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0)); // NEW
+    println!("Computational time for {} epochs: {:.3} seconds with rate of {:.3} epoch/second", epochs, (duration as f32)/1000.0, (epochs as f32)/((duration as f32)/1000.0));
 
     draw(&mut image, &shapes);
     _ = image.save(output_image_path);
@@ -182,7 +181,6 @@ fn mutate<'a>(shapes: &'a Vec<Triangle>, w: i32) -> Vec<Triangle> {
         shapes_copy[index].color = new_color;
     }
 
-    // TODO change the stacking order to improve the accuracy
     return shapes_copy
 }
 
@@ -221,11 +219,10 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
     let y3 = triangle.points[2].y as i32;
 
     let xmin = min(x1, min(x2, x3)) as i32;
-    let xmax = min(max(x1, max(x2, x3)), image.width() as i32); // TODO this should already be clamped before
+    let xmax = min(max(x1, max(x2, x3)), image.width() as i32);
     let ymin = min(y1, min(y2, y3)) as i32;
     let ymax = min(max(y1, max(y2, y3)), image.height() as i32);
 
-    // TODO http://totologic.blogspot.com/2014/01/accurate-point-in-triangle-test.html
     for x in xmin .. xmax  {
         for y in ymin .. ymax {
             let asx = x - x1;
@@ -241,5 +238,3 @@ fn draw_triangle(triangle: &Triangle, image: &mut ImgRGBA) {
         }
     }
 }
-
-// TODO look at this, to prevent compute all triangles every single time. If I get how the image was before, and the transformations afterwards, I then only need to change that specific layer
