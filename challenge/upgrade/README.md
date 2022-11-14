@@ -5,23 +5,9 @@ To evaluate the performance of the program, it is elapsed all epoch times. An ep
 The goal of this program is to replicate a target image with a set of N overlapped polygons with V vertices. In each epoch, it is randomly selected a random polygon and one of its vertices (x,y) or an RGBA parameter is randomly modified. At the end of each epoch, if the modification closes the gap between the generation and the target image, the modification is kept. In this specific version, it used triangles and the stacking order is fixed. In the end, the program generates an image with the same dimensions as the target image: L(ength)=W(idth)\*H(eight).
 
 To run the model do:
-<div class="highlight">
-  <code> cargo run <number of epochs> </code>
-  <button>Copy</button>
-</div>
-
----
-## Implementations
-
-1. [Deeper Immutable Layers](#deeper-immutable-layers))
-* Saving the pixels of each triangle
-
-    2. [Outer Immutable Layers](#outer-immutable-layers)
-    3. [Fitness Function](#fitness-function)
-4. [Specific struct for the new shape in the test](#struct-for-the-new-shape-in-the-test)
-5. [Changing a value on the on-test shape](#changing-a-value-on-the-on-test-shape)
-6. [Constant operation terms in drawing a triangle](#constant-operation-terms-in-drawing-a-triangle)
-7. [Passing by reference instead of by value](#passing-by-reference-instead-of-by-value)
+```python
+cargo run <number of epochs>
+```
 
 ### Terminology 
 
@@ -34,6 +20,19 @@ To run the model do:
 **E** is the number of epochs.
 
 The complexity to iterate over all pixels of a Triangle varies on the occupied area of the triangle from [1, L/2]. Let's use **T** as the average complexity to iterate over a triangle shape.
+
+
+## Implementations
+
+1. [Deeper Immutable Layers](#deeper-immutable-layers))
+* Saving the pixels of each triangle
+
+    2. [Outer Immutable Layers](#outer-immutable-layers)
+    3. [Fitness Function](#fitness-function)
+4. [Specific struct for the new shape in the test](#struct-for-the-new-shape-in-the-test)
+5. [Changing a value on the on-test shape](#changing-a-value-on-the-on-test-shape)
+6. [Constant operation terms in drawing a triangle](#constant-operation-terms-in-drawing-a-triangle)
+7. [Passing by reference instead of by value](#passing-by-reference-instead-of-by-value)
 
 ---
 Major Optimizations
