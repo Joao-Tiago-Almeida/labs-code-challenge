@@ -25,8 +25,8 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    let target_image_path = "monalisa.png";
-    let output_image_path = "output-monalisa.png";
+    let target_image_path = "./images/monalisa.png";
+    let output_image_path = "./images/output-monalisa.png";
 
     // number of epochs
     let epochs = args[1].parse::<i32>().unwrap();
