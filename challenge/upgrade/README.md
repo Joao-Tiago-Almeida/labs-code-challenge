@@ -24,7 +24,7 @@ The complexity to iterate over all pixels of a Triangle varies on the occupied a
 
 ## Implementations
 
-1. [Deeper Immutable Layers](#deeper-immutable-layers))
+1. [Deeper Immutable Layers](#deeper-immutable-layers)
 * Saving the pixels of each triangle
 
     2. [Outer Immutable Layers](#outer-immutable-layers)
